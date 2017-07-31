@@ -1,0 +1,115 @@
+---
+title: "Practical ML Project"
+author: "Ahsan Habib"
+date: "7/28/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret);library(rpart); library(rpart.plot)
+library(randomForest); library(repmis); library(corrplot)
+```
+
+#Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#Project Goal:
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+
+# Loading the files in R
+The files has been downloaded in the local directory from the URL mentioned above. 
+
+```{r load-data, echo=TRUE}
+training <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+testing <- read.csv("pml-testing.csv", na.strings = c("NA", ""))
+
+#Dimention of testing data
+dim(testing)
+
+#Dimention of training data 
+dim(training)
+```
+
+# Cleaning the data
+The files has been downloaded in the local directory from the URL mentioned above. 
+
+```{r clean-data, echo=TRUE}
+#Remove Columns with NA's
+training <- training[, colSums(is.na(training)) == 0]
+testing <- testing[, colSums(is.na(testing)) == 0]
+
+```
+
+## Split the data
+To get the out of sample errors, we split the dataset training into a training set (60%) and validation set (40%)
+
+```{r split-data, echo=TRUE}
+set.seed(2017) 
+training_index <- createDataPartition(training$classe, p = 0.6, list = FALSE)
+train_set <- training[training_index, ]
+valid_set <- training[-training_index, ]
+
+#Remove variable with zero varience
+nzv <- nearZeroVar(train_set)
+train_set <- train_set[, -nzv]
+valid_set <- valid_set[, -nzv]
+
+#Remove the first 5 columns - as they dont impact the prediction
+
+train_set <- train_set[,-(1:7)]
+valid_set <- valid_set[,-(1:7)]
+
+```
+
+#Prediction
+
+
+```{r predict-data, echo=TRUE, cache=TRUE}
+#Setup train parameters
+trainControl <- trainControl(method="cv", number=3, verboseIter=F)
+
+modelGBM<- train(classe ~ .,data=train_set,trControl=trainControl,method='gbm')
+
+modelGBM$finalModel # Print the GBM final model info
+
+modelRF <- train(classe ~ ., data=train_set,method="rf",trControl=trainControl)
+
+modelRF$finalModel # Print the RF final model info
+
+# Use the 2 model to predict on the valid_set
+
+predsGBM <- predict(modelGBM, newdata=valid_set)
+predsRF <- predict(modelRF, newdata = valid_set)
+
+# below are the confusion matrix with 2 different model
+confusionMatrix(valid_set$classe, predsGBM)
+confusionMatrix(valid_set$classe, predsRF)
+```
+#### Accuracy rate of the GBM prediction is 95.53%
+#### Acuracy rate of the Random Forest prediction is 99.3%
+#### We select the Random Forest as out prediction model.
+
+## Utilize the best model to predict using the test data from pml-testing.csv
+
+```{r predict-test-data, echo=TRUE}
+preds <- predict(modelRF, newdata = testing)
+preds <- as.character(preds)
+testingPrediction <- data.frame(
+  problem_id=testing$problem_id,
+  predicted=preds
+)
+print(testingPrediction)
+
+```
+
+#Conclusion
+#### Based on the data available, Random Forest prediction model provided us with a very accurate result (99.3% accuracy). 
+
+
+
+
+
+
